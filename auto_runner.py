@@ -223,3 +223,32 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ── Mobula enrichment example ──────────────────────────
+# Shows real on-chain data: price, holders, liquidity
+def screen_token_with_mobula(mint: str) -> dict:
+    """
+    Enrich a token with real Mobula API data.
+    Returns price, liquidity, and holder concentration.
+    """
+    from mobula_client import mobula
+    
+    price_data = mobula.get_price(mint)
+    security_data = mobula.get_security(mint)
+    
+    if price_data:
+        print(f"[MOBULA] {mint[:12]}... | "
+              f"price=${price_data.get('price_usd', 0):.8f} | "
+              f"liq=${price_data.get('liq_usd', 0):,.0f} | "
+              f"mcap=${price_data.get('mcap_usd', 0):,.0f}")
+    
+    if security_data:
+        print(f"[MOBULA] {mint[:12]}... | "
+              f"top10={security_data.get('top10_holders', 0):.1f}% | "
+              f"honeypot={security_data.get('is_honeypot', False)}")
+    
+    return {
+        "price": price_data,
+        "security": security_data
+    }
