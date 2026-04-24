@@ -1,0 +1,11 @@
+.env
+.env.*
+*.key
+__pycache__/
+*.pyc
+*.pyo
+data/
+*.db
+*.pkl
+*.log
+state.json
