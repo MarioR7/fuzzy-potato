@@ -8,12 +8,15 @@ from typing import Deque, Dict, Tuple
 
 from dotenv import load_dotenv
 
-from onchain.engine import Engine
-from onchain.helius_ws import HeliusSwapMonitor
-from onchain.real_feed_dexscreener import DexScreenerRealFeed
-from onchain.helius_volume_ws import HeliusVolumeWS
-from onchain.pumpfun_ws import PumpFunWS
-from onchain import logger
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from engine import Engine
+from helius_ws import HeliusSwapMonitor
+from real_feed_dexscreener import DexScreenerRealFeed
+from helius_volume_ws import HeliusVolumeWS
+from pumpfun_ws import PumpFunWS
+import logger
 
 load_dotenv()
 

@@ -5,13 +5,13 @@ import threading
 import time
 from typing import Dict, Optional, Any, Callable
 
-from onchain.autosell import AutoSellManager
-from onchain import logger
-from onchain.risk import dynamic_tp_sl, apply_volume_bias
-from onchain.helius_volume_ws import HeliusVolumeWS
+from autosell import AutoSellManager
+import logger
+from risk import dynamic_tp_sl, apply_volume_bias
+from helius_volume_ws import HeliusVolumeWS
 
-from onchain.jupiter_live import JupiterLive
-from onchain.live_guard import mint_allowed
+from jupiter_live import JupiterLive
+from live_guard import mint_allowed
 
 
 def _env_bool(name: str, default: str = "0") -> bool:

@@ -5,7 +5,7 @@ import random
 import time
 from typing import Dict, Any, Optional
 
-from onchain.risk import compute_risk_plan
+from risk import compute_risk_plan
 
 
 class AutoSellManager:
