@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import os
+import json
+import time
+import threading
+import websocket
+from typing import Dict, Optional
+
+
+class HeliusVolumeWS:
+    """
+    Real-time swap activity monitor via Helius WebSocket.
+
+    Purpose:
+    - Track live swap frequency per mint
+    - Detect volume decay
+    - Support early exit + trailing TP logic
+    """
+
+    def __init__(self):
+        api_key = os.getenv("HELIUS_API_KEY")
+        if not api_key:
+            raise RuntimeError("HELIUS_API_KEY missing")
+
+        self.ws_url = f"wss://mainnet.helius-rpc.com/?api-key={api_key}"
+
+        self._lock = threading.Lock()
+        self._ws: Optional[websocket.WebSocketApp] = None
+        self._thread: Optional[threading.Thread] = None
+
+        # mint -> last activity timestamp
+        self.last_activity: Dict[str, float] = {}
+
+        # mint -> rolling activity counter
+        self.activity_count: Dict[str, int] = {}
+
+        self.running = False
+
+    # --------------------------------------------------
+    # PUBLIC API
+    # --------------------------------------------------
+    def start(self):
+        if self.running:
+            return
+
+        self.running = True
+        self._ws = websocket.WebSocketApp(
+            self.ws_url,
+            on_open=self._on_open,
+            on_message=self._on_message,
+            on_error=self._on_error,
+            on_close=self._on_close,
+        )
+
+        self._thread = threading.Thread(target=self._ws.run_forever, daemon=True)
+        self._thread.start()
+
+        print("[HELIUS-WS] Volume stream connected")
+
+    def stop(self):
+        self.running = False
+        try:
+            if self._ws:
+                self._ws.close()
+        except Exception:
+            pass
+
+        print("[HELIUS-WS] Volume stream stopped")
+
+    # --------------------------------------------------
+    # CORE CALLBACKS
+    # --------------------------------------------------
+    def _on_open(self, ws):
+        # Subscribe to ALL swaps (lightweight filter later)
+        sub = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "logsSubscribe",
+            "params": [
+                {"mentions": ["swap"]},
+                {"commitment": "confirmed"},
+            ],
+        }
+        ws.send(json.dumps(sub))
+
+    def _on_message(self, ws, message):
+        try:
+            data = json.loads(message)
+        except Exception:
+            return
+
+        params = data.get("params") or {}
+        result = params.get("result") or {}
+        value = result.get("value") or {}
+        logs = value.get("logs") or []
+
+        now = time.time()
+
+        for log in logs:
+            if "swap" not in log.lower():
+                continue
+
+            # VERY lightweight mint extraction heuristic
+            # (exact parsing comes later)
+            for token in log.split():
+                if len(token) >= 32 and len(token) <= 44:
+                    mint = token
+                    with self._lock:
+                        self.last_activity[mint] = now
+                        self.activity_count[mint] = self.activity_count.get(mint, 0) + 1
+
+    def _on_error(self, ws, error):
+        print(f"[HELIUS-WS] error: {error}")
+
+    def _on_close(self, ws, *_):
+        print("[HELIUS-WS] connection closed")
+
+    # --------------------------------------------------
+    # QUERY HELPERS (USED BY AUTOSELL)
+    # --------------------------------------------------
+    def seconds_since_activity(self, mint: str) -> Optional[float]:
+        with self._lock:
+            ts = self.last_activity.get(mint)
+        if not ts:
+            return None
+        return max(0.0, time.time() - ts)
+
+    def activity_score(self, mint: str, window_sec: int = 60) -> int:
+        """
+        Simple activity strength metric.
+        """
+        with self._lock:
+            return self.activity_count.get(mint, 0)
