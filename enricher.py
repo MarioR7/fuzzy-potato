@@ -118,7 +118,26 @@ def enrich(base_mint: str):
     )
 
     if not best_pair:
-        print("🧊 DexScreener: timed out (still not indexed / no liquidity)")
+        print("🧊 DexScreener: timed out — falling back to Mobula API")
+        try:
+            from mobula_client import mobula
+            price_data = mobula.get_price(mint)
+            security_data = mobula.get_security(mint)
+            if price_data and price_data.get("liq_usd"):
+                print(f"[MOBULA] Fallback enrichment | "
+                      f"price=${price_data.get('price_usd', 0):.8f} | "
+                      f"liq=${price_data.get('liq_usd', 0):,.0f} | "
+                      f"top10={security_data.get('top10_holders', 0) if security_data else 0:.1f}%")
+                return {
+                    "price_usd": price_data.get("price_usd"),
+                    "liq_usd": price_data.get("liq_usd"),
+                    "mcap_usd": price_data.get("mcap_usd"),
+                    "top10_holders": security_data.get("top10_holders") if security_data else None,
+                    "is_honeypot": security_data.get("is_honeypot") if security_data else None,
+                    "source": "mobula",
+                }
+        except Exception as e:
+            print(f"[MOBULA] Fallback failed: {e}")
         return
 
     # ✅ Once live, print useful sniper info
